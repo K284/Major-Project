@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Forecast App</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid black;
+      padding: 8px;
+      text-align: left;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Weather Forecast App</h1>
+
+  <label for="city">Enter city name:</label>
+  <input type="text" id="city" placeholder="Enter city name">
+  <button onclick="getWeatherData()">Get Weather</button>
+  <h3>Please refresh before entering a new city name</h3>
+
+  <div id="currentWeather"></div>
+  <canvas id="chart"></canvas>
+  <table id="forecastTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Temperature (°C)</th>
+        <th>Humidity (%)</th>
+        <th>Weather Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
+
+  <script>
+    function getWeatherData() {
+      // Clear chart data arrays
+      var chartLabels = [];
+      var temperatureData = [];
+      var humidityData = [];
+      var weatherConditionsData = [];
+
+      var city = document.getElementById('city').value || 'Delhi';
+      var apiKey = 'a8a0b6abd3a9a66c907e131eecb5ce2a'; // Replace with your OpenWeatherMap API key
+
+      fetch('https://api.openweathermap.org/data/2.5/weather?q=' + city + '&appid=' + apiKey)
+        .then(response => response.json())
+        .then(data => {
+          var currentWeather = document.getElementById('currentWeather');
+          currentWeather.innerHTML = `
+            <h2>${data.name}</h2>
+            <p>Weather: ${data.weather[0].main}</p>
+            <p>Temperature: ${Math.round(data.main.temp - 273.15)}°C</p>
+            <p>Humidity: ${data.main.humidity}%</p>
+            <p>Wind Speed: ${data.wind.speed} m/s</p>
+            <p>Date and Time: ${new Date(data.dt * 1000)}</p>
+          `;
+        })
+        .catch(error => {
+          console.log('Error:', error);
+        });
+
+      fetch('https://api.openweathermap.org/data/2.5/forecast?q=' + city + '&appid=' + apiKey)
+        .then(response => response.json())
+        .then(data => {
+          var forecastTableBody = document.querySelector('#forecastTable tbody');
+          forecastTableBody.innerHTML = '';
+
+          // Get the current date
+          var currentDate = new Date();
+          currentDate.setHours(0, 0, 0, 0); // Set the time to midnight
+
+          // Filter the forecasts to get the next 9 consecutive days
+          var filteredForecasts = data.list.filter(forecast => {
+            var forecastDate = new Date(forecast.dt * 1000);
+            forecastDate.setHours(0, 0, 0, 0); // Set the time to midnight
+
+            // Compare the forecast date with the current date
+            return forecastDate >= currentDate && forecastDate <= new Date(currentDate.getTime() + (8 * 24 * 60 * 60 * 1000));
+          });
+
+          var uniqueDates = {}; // Object to store unique dates
+
+          filteredForecasts.forEach(forecast => {
+            var dateTime = new Date(forecast.dt * 1000);
+            var forecastDate = dateTime.toLocaleDateString();
+
+            // Skip if the date is already added to uniqueDates
+            if (uniqueDates[forecastDate]) {
+              return;
+            }
+
+            uniqueDates[forecastDate] = true;
+
+            var temperature = Math.round(forecast.main.temp - 273.15);
+            var humidity = forecast.main.humidity;
+            var weatherCondition = forecast.weather[0].main;
+
+            var row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${forecastDate}</td>
+              <td>${temperature}°C</td>
+              <td>${humidity}%</td>
+              <td>${weatherCondition}</td>
+            `;
+
+            forecastTableBody.appendChild(row);
+
+            chartLabels.push(forecastDate);
+            temperatureData.push(temperature);
+            humidityData.push(humidity);
+            weatherConditionsData.push(weatherCondition);
+          });
+
+          var chartData = {
+            labels: chartLabels,
+            datasets: [{
+              label: 'Temperature (°C)',
+              data: temperatureData,
+              borderColor: 'rgb(255, 99, 132)',
+              fill: false
+            }, {
+              label: 'Humidity (%)',
+              data: humidityData,
+              borderColor: 'rgb(54, 162, 235)',
+              fill: false
+            }, {
+              label: 'Weather Conditions',
+              data: weatherConditionsData,
+              borderColor: 'rgb(75, 192, 192)',
+              fill: false
+            }]
+          };
+
+          var ctx = document.getElementById('chart').getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {}
+          });
+        })
+        .catch(error => {
+          console.log('Error:', error);
+        });
+    }
+  </script>
+</body>
+
+</html>
